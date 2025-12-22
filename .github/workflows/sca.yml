@@ -1,57 +1,58 @@
-name: Snyk Node.js Scan
+name: Python SCA Scan with Snyk
 
 on:
   push:
-    branches: ['**']
+    branches: ["**"]
   pull_request:
-    branches: ['**']
-  workflow_dispatch:
+    branches: ["**"]
+
+permissions:
+  contents: read
+  security-events: write
 
 jobs:
-  snyk-node:
+  security:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      security-events: write  # Needed for SARIF upload
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
         with:
-          node-version: '18'
+          python-version: '3.11'
 
       - name: Install dependencies
-        run: npm install
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
       - name: Install Snyk CLI
         run: |
-          curl -Lo snyk https://github.com/snyk/snyk/releases/latest/download/snyk-linux
+          curl -Lo snyk https://static.snyk.io/cli/latest/snyk-linux
           chmod +x snyk
-          sudo mv snyk /usr/local/bin/snyk
+          sudo mv snyk /usr/local/bin/
 
-      - name: Authenticate with Snyk
-        run: snyk auth c80a2012-bb87-4482-beb5-399c664f183d
-
-      - name: Run Snyk test and capture result
+      - name: Run Snyk test and generate SARIF
         id: snyk-test
         run: |
-          snyk test --file=package.json \
-                    --severity-threshold=high \
-                    --sarif-file-output=snyk-node.sarif || echo "SNYK_TEST_FAILED=true" >> $GITHUB_ENV
+          snyk test --sarif-file-output=snyk.sarif --severity-threshold=high --fail-on=all || echo "Snyk test completed with issues"
+        env:
+          SNYK_TOKEN: a1eb8b76-9f7f-4ff8-8fcb-e951abcdfa23
 
-      - name: Monitor project in Snyk
-        run: snyk monitor --file=package.json
+      - name: Push results to Snyk portal
+        run: snyk monitor --all-projects
+        env:
+          SNYK_TOKEN: a1eb8b76-9f7f-4ff8-8fcb-e951abcdfa23
 
-      - name: Upload SARIF report
-        uses: github/codeql-action/upload-sarif@v2
+      - name: Upload SARIF to GitHub Code Scanning
+        uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: snyk-node.sarif
+          sarif_file: snyk.sarif
 
-      - name: Fail job if Snyk test failed
-        if: env.SNYK_TEST_FAILED == 'true'
+      - name: Fail job if Snyk found high/critical issues
         run: |
-          echo "High or critical vulnerabilities detected. Failing the build."
-          exit 1
+          snyk test --severity-threshold=high --fail-on=all
+        env:
+          SNYK_TOKEN: a1eb8b76-9f7f-4ff8-8fcb-e951abcdfa23
