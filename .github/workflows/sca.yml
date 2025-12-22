@@ -19,7 +19,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Snyk CLI
-        uses: snyk/actions/setup@v4
+        uses: snyk/actions/setup@v3
 
       - name: Run Snyk Dependency Scan and Generate SARIF
         env:
@@ -31,11 +31,11 @@ jobs:
             --sarif-file-output=snyk-library.sarif || true
 
       - name: Upload SARIF to GitHub Code Scanning
-        uses: github/codeql-action/upload-sarif@v4
+        uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: snyk-library.sarif
 
       - name: Snyk Monitor
         env:
-          SNYK_TOKEN: c80a2012-bb87-4482-beb5-399c664f183d
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: snyk monitor --all-projects
