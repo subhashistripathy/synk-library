@@ -1,41 +1,23 @@
-name: Snyk Open Source Library Scan (SARIF)
+name: gitleaks
 
 on:
   push:
-    branches: [ "main", "master" ]
+    branches:
+      - main  # Change if your target branch is different
   pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
-  snyk-library-scan:
+  scan:
+    name: gitleaks
     runs-on: ubuntu-latest
-
-    permissions:
-      contents: read
-      security-events: write
-
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Setup Snyk CLI
-        uses: snyk/actions/setup@v3
-
-      - name: Run Snyk Dependency Scan and Generate SARIF
-        env:
-          SNYK_TOKEN: c80a2012-bb87-4482-beb5-399c664f183d
-        run: |
-          snyk test \
-            --all-projects \
-            --severity-threshold=medium \
-            --sarif-file-output=snyk-library.sarif || true
-
-      - name: Upload SARIF to GitHub Code Scanning
-        uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: snyk-library.sarif
+          fetch-depth: 0
 
-      - name: Snyk Monitor
-        env:
-          SNYK_TOKEN: c80a2012-bb87-4482-beb5-399c664f183d
-        run: snyk monitor --all-projects
+      - name: Run Gitleaks (don't fail if secrets are found)
+        uses: gitleaks/gitleaks-action@v2
