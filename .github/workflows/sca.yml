@@ -37,5 +37,5 @@ jobs:
 
       - name: Snyk Monitor
         env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+          SNYK_TOKEN: c80a2012-bb87-4482-beb5-399c664f183d
         run: snyk monitor --all-projects
