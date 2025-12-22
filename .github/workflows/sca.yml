@@ -1,46 +1,57 @@
-name: Snyk Library Scan (SCA + SARIF)
+name: Snyk Node.js Scan
 
 on:
   push:
-    branches: [ main, master ]
+    branches: ['**']
   pull_request:
+    branches: ['**']
   workflow_dispatch:
 
 jobs:
-  snyk-library-scan:
+  snyk-node:
     runs-on: ubuntu-latest
-
     permissions:
       contents: read
-      security-events: write
+      security-events: write  # Needed for SARIF upload
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
         with:
-          node-version: '20'
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm install
 
       - name: Install Snyk CLI
-        run: npm install -g snyk
-
-      - name: Authenticate Snyk
-        env:
-          SNYK_TOKEN: c80a2012-bb87-4482-beb5-399c664f183d
-        run: snyk auth "$SNYK_TOKEN"
-
-      # 🔹 Generate SARIF (guaranteed)
-      - name: Run Snyk SCA Scan (Generate SARIF)
-        env:
-          SNYK_TOKEN: c80a2012-bb87-4482-beb5-399c664f183d
         run: |
-          snyk test --all-projects --sarif-file-output=snyk.sarif || true
-          ls -l snyk.sarif
+          curl -Lo snyk https://github.com/snyk/snyk/releases/latest/download/snyk-linux
+          chmod +x snyk
+          sudo mv snyk /usr/local/bin/snyk
 
-      # 🔹 Upload SARIF using v4 (latest)
-      - name: Upload SARIF to GitHub Code Scanning
-        uses: github/codeql-action/upload-sarif@v4
+      - name: Authenticate with Snyk
+        run: snyk auth c80a2012-bb87-4482-beb5-399c664f183d
+
+      - name: Run Snyk test and capture result
+        id: snyk-test
+        run: |
+          snyk test --file=package.json \
+                    --severity-threshold=high \
+                    --sarif-file-output=snyk-node.sarif || echo "SNYK_TEST_FAILED=true" >> $GITHUB_ENV
+
+      - name: Monitor project in Snyk
+        run: snyk monitor --file=package.json
+
+      - name: Upload SARIF report
+        uses: github/codeql-action/upload-sarif@v2
         with:
-          sarif_file: snyk.sarif
+          sarif_file: snyk-node.sarif
+
+      - name: Fail job if Snyk test failed
+        if: env.SNYK_TEST_FAILED == 'true'
+        run: |
+          echo "High or critical vulnerabilities detected. Failing the build."
+          exit 1
